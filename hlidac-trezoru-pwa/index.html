@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Hlídač trezoru</title>
+<meta name="theme-color" content="#14171c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hlídač trezoru">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+  :root{
+    --bg:#14171c; --surface:#1c212a; --surface-2:#232a34; --line:#2c333e;
+    --text:#e8eaed; --muted:#8b93a1; --brass:#c9a227; --brass-dim:#8a7220;
+    --rust:#c1452d; --ok:#4c9a6a;
+    --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0; background:var(--bg); color:var(--text); font-family:var(--sans);
+    padding:calc(env(safe-area-inset-top) + 20px) 16px calc(env(safe-area-inset-bottom) + 40px);
+    min-height:100vh;
+  }
+  .wrap{max-width:480px;margin:0 auto;}
+  .hidden{display:none !important;}
+  .topbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:0.12em;color:var(--brass);text-transform:uppercase;width:100%;}
+  h1{font-size:22px;margin:2px 0 10px;font-weight:650;width:100%;}
+  #vaultSelect{flex:1 1 auto;background:var(--surface-2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:10px;font-size:14px;}
+  .topbar-actions{display:flex;gap:6px;}
+  .icon-btn{width:38px;height:38px;padding:0;border-radius:9px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);font-size:16px;}
+  .icon-btn.danger:active{border-color:var(--rust);color:var(--rust);}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:14px;}
+  .dial-row{display:flex;justify-content:center;}
+  .dial-center{font-family:var(--mono);text-align:center;}
+  .dial-num{font-size:34px;font-weight:700;}
+  .dial-label{font-size:11px;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;margin-top:3px;}
+  .status-line{text-align:center;font-size:13px;color:var(--muted);margin-top:6px;}
+  .status-line.overdue{color:var(--rust);font-weight:600;}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px;}
+  .stat{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;}
+  .stat .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;}
+  .stat .v{font-family:var(--mono);font-size:14px;margin-top:3px;}
+  .row{display:flex;gap:8px;margin-top:14px;}
+  button{font-family:var(--sans);font-size:13.5px;font-weight:600;border-radius:9px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);padding:12px 12px;cursor:pointer;flex:1 1 auto;}
+  button.primary{background:var(--brass);border-color:var(--brass);color:#171308;}
+  .link-btn{background:none;border:none;color:var(--muted);font-size:12.5px;font-weight:650;padding:0;text-align:left;flex:none;width:100%;}
+  .checklist-panel{margin-top:16px;padding-top:16px;border-top:1px solid var(--line);}
+  .checklist-title{font-size:11.5px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em;}
+  .cl-item{display:flex;align-items:flex-start;gap:9px;font-size:13.5px;margin-bottom:10px;line-height:1.4;}
+  .cl-item input{margin-top:3px;width:18px;height:18px;}
+  #noteInput{width:100%;font-family:var(--sans);background:var(--surface-2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:11px;font-size:13.5px;margin-top:6px;}
+  .settings{margin-top:14px;}
+  .field{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .field label{font-size:13.5px;}
+  select{font-family:var(--sans);background:var(--surface-2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 10px;font-size:13.5px;}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.5;}
+  #logList{list-style:none;margin:12px 0 0;padding:0;max-height:260px;overflow-y:auto;}
+  #logList li{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px;}
+  #logList li:last-child{border-bottom:none;}
+  .dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex:0 0 auto;}
+  .dot.check{background:var(--brass);}
+  .dot.move{background:var(--ok);}
+  .log-meta{color:var(--muted);font-family:var(--mono);font-size:11px;}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:12px 0;}
+  .install-hint{font-size:12px;color:var(--muted);text-align:center;line-height:1.7;margin-bottom:14px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px;}
+  .footer-hint{font-size:11px;color:var(--muted);text-align:center;line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Trezor · seed fráze</div>
+  <h1>Hlídač trezoru</h1>
+
+  <div class="install-hint" id="installHint">
+    Pro spolehlivé fungování si appku přidej na plochu: v Safari klepni na ikonu sdílení, pak „Přidat na plochu“.
+  </div>
+
+  <div class="topbar">
+    <select id="vaultSelect"></select>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="btnNewVault" title="Nový trezor">+</button>
+      <button class="icon-btn" id="btnRenameVault" title="Přejmenovat">✎</button>
+      <button class="icon-btn danger" id="btnDeleteVault" title="Smazat trezor">✕</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="dial-row">
+      <svg width="160" height="160" viewBox="0 0 160 160">
+        <circle cx="80" cy="80" r="66" fill="none" stroke="var(--line)" stroke-width="10"/>
+        <circle id="arc" cx="80" cy="80" r="66" fill="none" stroke="var(--brass)" stroke-width="10"
+          stroke-linecap="round" transform="rotate(-90 80 80)"
+          stroke-dasharray="414" stroke-dashoffset="414"/>
+        <foreignObject x="15" y="55" width="130" height="65">
+          <div xmlns="http://www.w3.org/1999/xhtml" class="dial-center">
+            <div class="dial-num" id="dialNum">–</div>
+            <div class="dial-label" id="dialLabel">dní do kontroly</div>
+          </div>
+        </foreignObject>
+      </svg>
+    </div>
+    <div class="status-line" id="statusLine">Načítám…</div>
+
+    <div class="stats">
+      <div class="stat"><div class="k">Poslední kontrola</div><div class="v" id="lastCheckV">—</div></div>
+      <div class="stat"><div class="k">Poslední přemístění</div><div class="v" id="lastMoveV">—</div></div>
+    </div>
+
+    <div class="row">
+      <button class="primary" id="btnStartCheck">Zkontrolovat</button>
+      <button id="btnMove">Přemístěno dnes</button>
+    </div>
+
+    <div class="checklist-panel hidden" id="checklistPanel">
+      <div class="checklist-title">Před potvrzením projdi:</div>
+      <label class="cl-item"><input type="checkbox" data-cl="0"> Fráze je čitelná a kompletní (všechna slova)</label>
+      <label class="cl-item"><input type="checkbox" data-cl="1"> Úložiště bez poškození, vlhkosti nebo koroze</label>
+      <label class="cl-item"><input type="checkbox" data-cl="2"> Pořadí slov odpovídá původnímu zápisu</label>
+      <label class="cl-item"><input type="checkbox" data-cl="3"> Umístění je stále bezpečné a důvěrné</label>
+      <label class="cl-item"><input type="checkbox" data-cl="4"> (Volitelně) Ověřeno testovací obnovou / adresou</label>
+      <input type="text" id="noteInput" placeholder="Poznámka (bez seed fráze, PINu, hesel)">
+      <div class="row">
+        <button class="primary" id="btnConfirmCheck">Potvrdit kontrolu</button>
+        <button id="btnCancelCheck">Zrušit</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <button class="link-btn" id="toggleSettings">Nastavení intervalů ▾</button>
+    <div class="settings hidden" id="settingsBody">
+      <div class="field"><label for="checkInterval">Kontrolovat každých</label>
+        <select id="checkInterval"><option value="3">3 měsíce</option><option value="6">6 měsíců</option><option value="12">12 měsíců</option></select>
+      </div>
+      <div class="field"><label for="moveInterval">Zvážit přemístění každých</label>
+        <select id="moveInterval"><option value="12">12 měsíců</option><option value="24">24 měsíců</option><option value="36">36 měsíců</option></select>
+      </div>
+      <div class="hint">Neukládej sem seed frázi, PIN ani hesla — jen data a krátké poznámky.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <button class="link-btn" id="toggleLog">Historie ▾</button>
+    <div class="hidden" id="logBody">
+      <ul id="logList"></ul>
+      <div class="empty" id="logEmpty">Zatím žádný záznam.</div>
+    </div>
+  </div>
+
+  <div class="footer-hint">Data zůstávají jen v tomto zařízení. Odznak a upozornění se aktualizují při otevření appky — pro jistotu doporučujeme i opakující se Připomínku v iOS.</div>
+</div>
+
+<script>
+const STORAGE_KEY = 'vault-watch:data';
+let vaults = [];
+let activeId = null;
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(d){ if(!d) return '— (nikdy)'; return new Date(d).toLocaleDateString('cs-CZ',{day:'numeric',month:'numeric',year:'numeric'}); }
+function addMonths(dateStr, months){ const d = new Date(dateStr); d.setMonth(d.getMonth()+months); return d; }
+function daysBetween(a,b){ return Math.round((b-a)/(1000*60*60*24)); }
+function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function defaultVault(name){
+  return { id: uid(), name: name || 'Trezor 1', checkInterval: 6, moveInterval: 12,
+    lastCheck: null, lastMove: null, history: [] };
+}
+
+function load(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const data = JSON.parse(raw);
+      vaults = data.vaults || [];
+      activeId = data.activeId;
+    }
+  }catch(e){}
+  if(vaults.length === 0){ vaults.push(defaultVault('Trezor 1')); }
+  if(!activeId || !vaults.some(v => v.id === activeId)){ activeId = vaults[0].id; }
+  save();
+  renderVaultSelect();
+  renderActive();
+  updateAppBadge();
+
+  // Hide the "add to home screen" tip once running as an installed app
+  if(window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches){
+    document.getElementById('installHint').classList.add('hidden');
+  }
+}
+
+function save(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ vaults, activeId }));
+  updateAppBadge();
+}
+
+function getActive(){ return vaults.find(v => v.id === activeId); }
+
+function anyOverdue(){
+  const now = new Date();
+  return vaults.some(v => {
+    const overdueCheck = !v.lastCheck || addMonths(v.lastCheck, v.checkInterval) < now;
+    const overdueMove = v.lastMove ? addMonths(v.lastMove, v.moveInterval) < now : false;
+    return overdueCheck || overdueMove;
+  });
+}
+
+function updateAppBadge(){
+  try{
+    if('setAppBadge' in navigator){
+      if(anyOverdue()){ navigator.setAppBadge(1); } else { navigator.clearAppBadge(); }
+    }
+  }catch(e){}
+}
+
+function renderVaultSelect(){
+  const sel = document.getElementById('vaultSelect');
+  sel.innerHTML = '';
+  vaults.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.id; opt.textContent = v.name;
+    if(v.id === activeId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function renderActive(){
+  const vault = getActive();
+  if(!vault) return;
+  document.getElementById('checkInterval').value = vault.checkInterval;
+  document.getElementById('moveInterval').value = vault.moveInterval;
+  document.getElementById('lastCheckV').textContent = fmtDate(vault.lastCheck);
+  document.getElementById('lastMoveV').textContent = fmtDate(vault.lastMove);
+
+  const now = new Date();
+  const dialNum = document.getElementById('dialNum');
+  const dialLabel = document.getElementById('dialLabel');
+  const statusLine = document.getElementById('statusLine');
+  const arc = document.getElementById('arc');
+  const circumference = 414;
+
+  if(!vault.lastCheck){
+    dialNum.textContent = '?';
+    dialLabel.textContent = 'ještě nezkontrolováno';
+    statusLine.textContent = 'Zaznamenej první kontrolu seed fráze.';
+    statusLine.className = 'status-line overdue';
+    arc.setAttribute('stroke-dashoffset', circumference);
+    arc.setAttribute('stroke', 'var(--rust)');
+  } else {
+    const dueDate = addMonths(vault.lastCheck, Number(vault.checkInterval));
+    const daysLeft = daysBetween(now, dueDate);
+    if(daysLeft < 0){
+      dialNum.textContent = Math.abs(daysLeft);
+      dialLabel.textContent = 'dní po termínu';
+      statusLine.textContent = 'Kontrola je po termínu.';
+      statusLine.className = 'status-line overdue';
+      arc.setAttribute('stroke-dashoffset', 0);
+      arc.setAttribute('stroke', 'var(--rust)');
+    } else {
+      const intervalDays = daysBetween(new Date(vault.lastCheck), dueDate);
+      const progress = intervalDays > 0 ? 1 - (daysLeft/intervalDays) : 1;
+      dialNum.textContent = daysLeft;
+      dialLabel.textContent = 'dní do kontroly';
+      statusLine.textContent = 'Příští kontrola: ' + fmtDate(dueDate.toISOString());
+      statusLine.className = daysLeft <= 7 ? 'status-line overdue' : 'status-line';
+      arc.setAttribute('stroke-dashoffset', circumference * (1 - Math.min(Math.max(progress,0),1)));
+      arc.setAttribute('stroke', daysLeft <= 7 ? 'var(--rust)' : 'var(--brass)');
+    }
+  }
+  renderLog(vault);
+}
+
+function renderLog(vault){
+  const list = document.getElementById('logList');
+  const empty = document.getElementById('logEmpty');
+  list.innerHTML = '';
+  if(!vault.history || vault.history.length === 0){ empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  [...vault.history].reverse().forEach(item => {
+    const li = document.createElement('li');
+    const dot = document.createElement('div');
+    dot.className = 'dot ' + item.type;
+    const content = document.createElement('div');
+    const label = item.type === 'check' ? 'Kontrola' : 'Přemístění';
+    const noteHtml = item.note ? ' — ' + escapeHtml(item.note) : '';
+    content.innerHTML = `<div>${label}${noteHtml}</div><div class="log-meta">${fmtDate(item.date)}</div>`;
+    li.appendChild(dot); li.appendChild(content); list.appendChild(li);
+  });
+}
+
+document.getElementById('vaultSelect').addEventListener('change', (e) => {
+  activeId = e.target.value; save(); renderActive();
+});
+
+document.getElementById('btnNewVault').addEventListener('click', () => {
+  const name = prompt('Název nového trezoru:', 'Trezor ' + (vaults.length + 1));
+  if(!name) return;
+  const v = defaultVault(name.trim());
+  vaults.push(v); activeId = v.id;
+  save(); renderVaultSelect(); renderActive();
+});
+
+document.getElementById('btnRenameVault').addEventListener('click', () => {
+  const vault = getActive();
+  const name = prompt('Nový název trezoru:', vault.name);
+  if(!name) return;
+  vault.name = name.trim(); save(); renderVaultSelect();
+});
+
+document.getElementById('btnDeleteVault').addEventListener('click', () => {
+  if(vaults.length === 1){ alert('Musí zůstat alespoň jeden trezor.'); return; }
+  const vault = getActive();
+  if(!confirm(`Smazat trezor „${vault.name}“ včetně historie?`)) return;
+  vaults = vaults.filter(v => v.id !== activeId);
+  activeId = vaults[0].id;
+  save(); renderVaultSelect(); renderActive();
+});
+
+document.getElementById('checkInterval').addEventListener('change', (e) => {
+  getActive().checkInterval = Number(e.target.value); save(); renderActive();
+});
+document.getElementById('moveInterval').addEventListener('change', (e) => {
+  getActive().moveInterval = Number(e.target.value); save(); renderActive();
+});
+
+document.getElementById('btnStartCheck').addEventListener('click', () => {
+  document.getElementById('checklistPanel').classList.remove('hidden');
+  document.querySelectorAll('.cl-item input').forEach(cb => cb.checked = false);
+  document.getElementById('noteInput').value = '';
+});
+document.getElementById('btnCancelCheck').addEventListener('click', () => {
+  document.getElementById('checklistPanel').classList.add('hidden');
+});
+document.getElementById('btnConfirmCheck').addEventListener('click', () => {
+  const vault = getActive();
+  const checked = [...document.querySelectorAll('.cl-item input')].map(cb => cb.checked);
+  const note = document.getElementById('noteInput').value.trim();
+  const today = todayStr();
+  vault.lastCheck = today;
+  vault.history.push({ type:'check', date: today, note, checklist: checked });
+  document.getElementById('checklistPanel').classList.add('hidden');
+  save(); renderActive();
+});
+document.getElementById('btnMove').addEventListener('click', () => {
+  const vault = getActive();
+  const note = document.getElementById('noteInput').value.trim();
+  const today = todayStr();
+  vault.lastMove = today;
+  vault.history.push({ type:'move', date: today, note });
+  save(); renderActive();
+});
+
+document.getElementById('toggleSettings').addEventListener('click', () => {
+  document.getElementById('settingsBody').classList.toggle('hidden');
+});
+document.getElementById('toggleLog').addEventListener('click', () => {
+  document.getElementById('logBody').classList.toggle('hidden');
+});
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
+load();
+</script>
+</body>
+</html>
